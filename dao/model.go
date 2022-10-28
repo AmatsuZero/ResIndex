@@ -1,4 +1,4 @@
-package main
+package dao
 
 import (
 	"database/sql"
@@ -24,7 +24,7 @@ type M3U8Resource struct {
 
 var DB *gorm.DB
 
-func init() {
+func InitDB() {
 	log.SetPrefix("DB ")
 	appFolder, _ := os.UserConfigDir()
 	if len(appFolder) == 0 {
@@ -56,11 +56,6 @@ func init() {
 		log.Fatalln("failed to connect database")
 	}
 	DB = db
-
-	err = db.AutoMigrate(&M3U8Resource{})
-	if err != nil {
-		log.Panicf("自动迁移失败: %v", err)
-	}
 }
 
 func (r *M3U8Resource) Any(conds ...interface{}) bool {
