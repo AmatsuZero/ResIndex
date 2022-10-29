@@ -75,7 +75,7 @@ func getTankPageLinks(start int) (err error) {
 					page++
 				}
 			})
-		updateDetails(models)
+		updateTankDetailPages(models)
 		// 保存
 		dao.DB.Save(&models)
 	}
@@ -84,7 +84,7 @@ func getTankPageLinks(start int) (err error) {
 }
 
 // 更新详情页
-func updateDetails(models []*tankModel) {
+func updateTankDetailPages(models []*tankModel) {
 	ch := make(chan struct{}, 10)
 	wg := &sync.WaitGroup{}
 
@@ -115,7 +115,7 @@ func updateDetails(models []*tankModel) {
 	wg.Wait()
 }
 
-func export(output string) {
+func exportTankPagesList(output string) {
 	fo, err := os.Create(output)
 	if err != nil {
 		log.Fatalf("创建文件失败: %v", err)
@@ -187,7 +187,7 @@ func Tank() *cobra.Command {
 		Short:  "导出为 m3u 格式",
 		PreRun: migrate,
 		Run: func(cmd *cobra.Command, args []string) {
-			export(output)
+			exportTankPagesList(output)
 		},
 	}
 	exportCmd.Flags().StringVarP(&output, "output", "o", "", "导出路径")
