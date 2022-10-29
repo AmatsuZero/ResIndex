@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
 	"github.com/spf13/cobra"
@@ -21,53 +22,62 @@ type ninetyOneVideo struct {
 	Author, Duration string
 }
 
-func extract91Links(ctx context.Context, htmlContent string) error {
-	dom, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
+func extract91Links(ctx context.Context, htmlContent string, hasNextPage *bool) error {
+	document, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
 	if err != nil {
 		return err
 	}
 
-	var models []*ninetyOneVideo
-	dom.Find(".col-xs-12.col-sm-4.col-md-3.col-lg-3").
-		Each(func(i int, selection *goquery.Selection) {
-			model := &ninetyOneVideo{}
-			sel := selection.Find(".well.well-sm.videos-text-align")
-			a := sel.Find("a")
-			ref, ok := a.Attr("href")
-			if ok {
-				model.Ref = sql.NullString{String: ref, Valid: true}
-			} else {
-				return
-			}
+	rows := document.Find("#wrapper > div.container.container-minheight > div.row > div > div").Children()
+	models := make([]*ninetyOneVideo, 0, rows.Length())
+	rows.Each(func(i int, selection *goquery.Selection) {
+		model := &ninetyOneVideo{}
+		sel := selection.Find(".well.well-sm.videos-text-align")
+		a := sel.Find("a")
+		ref, ok := a.Attr("href")
+		if ok {
+			model.Ref = sql.NullString{String: ref, Valid: true}
+		} else {
+			return
+		}
 
-			if !model.Any("ref = ?", ref) && len(model.Url) > 0 {
-				log.Printf("有数据，跳过: %v\n", ref)
-				return
-			}
+		if !dao.Any(model, "ref = ?", ref) && len(model.Url) > 0 {
+			log.Printf("有数据，跳过: %v\n", ref)
+			return
+		}
 
-			title := a.Find(".video-title.title-truncate.m-t-5").Text()
-			model.Name = sql.NullString{String: title, Valid: true}
+		title := a.Find(".video-title.title-truncate.m-t-5").Text()
+		model.Name = sql.NullString{String: title, Valid: true}
 
-			duration := a.Find(".duration").Text()
-			model.Duration = duration
+		duration := a.Find(".duration").Text()
+		model.Duration = duration
 
-			thumbnail, ok := a.Find(".thumb-overlay").Find(".img-responsive").Attr("src")
-			if ok {
-				model.Thumbnail = sql.NullString{String: thumbnail, Valid: true}
-			}
+		thumbnail, ok := a.Find(".thumb-overlay").Find(".img-responsive").Attr("src")
+		if ok {
+			model.Thumbnail = sql.NullString{String: thumbnail, Valid: true}
+		}
 
-			// 查找作者
-			html := selection.Text()
-			lb := strings.Index(html, "作者:")
-			rb := strings.Index(html, "热度:")
-			name := strings.TrimSpace(html[lb:rb])
-			parts := strings.Split(name, ":")
-			name = strings.TrimSpace(parts[1])
-			model.Author = name
+		// 查找作者
+		html := selection.Text()
+		lb := strings.Index(html, "作者:")
+		rb := strings.Index(html, "热度:")
+		name := strings.TrimSpace(html[lb:rb])
+		parts := strings.Split(name, ":")
+		name = strings.TrimSpace(parts[1])
+		model.Author = name
 
-			model.Create()
-			models = append(models, model)
-		})
+		dao.Create(model)
+		models = append(models, model)
+	})
+
+	document.Find("#paging > div > form").Children().EachWithBreak(func(i int, selection *goquery.Selection) bool {
+		txt := selection.Text()
+		if txt == "»" {
+			*hasNextPage = true
+			return false
+		}
+		return true
+	})
 
 	return update91PornDetails(ctx, models)
 }
@@ -88,9 +98,7 @@ func update91PornDetails(ctx context.Context, models []*ninetyOneVideo) error {
 				return
 			}
 
-			html, err := visit91Page(model.Ref.String,
-				"document.querySelector(\"#videodetails > div.video-container\")",
-				"#videodetails > div.video-container")
+			html, err := visit91Page(model.Ref.String)
 			<-ch
 
 			if err != nil {
@@ -98,12 +106,12 @@ func update91PornDetails(ctx context.Context, models []*ninetyOneVideo) error {
 				return
 			}
 
-			dom, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+			document, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 			if err != nil {
 				fmt.Printf("提取 %v 页面详情失败\n", model.Ref.String)
 				return
 			}
-			src, ok := dom.Find("#player_one_html5_api > source").Attr("src")
+			src, ok := document.Find("#player_one_html5_api > source").Attr("src")
 			if ok {
 				model.Url = src
 			}
@@ -115,7 +123,7 @@ func update91PornDetails(ctx context.Context, models []*ninetyOneVideo) error {
 	return nil
 }
 
-func visit91Page(url, jsPath, selector string, actions ...chromedp.Action) (html string, err error) {
+func visit91Page(url string) (html string, err error) {
 	options := []chromedp.ExecAllocatorOption{
 		chromedp.Flag("headless", true), // debug使用
 		chromedp.Flag("blink-settings", "imagesEnabled=false"),
@@ -145,17 +153,22 @@ func visit91Page(url, jsPath, selector string, actions ...chromedp.Action) (html
 		&res,
 	))
 
-	//创建一个上下文，超时时间为40s
-	timeoutCtx, cancel := context.WithTimeout(chromeCtx, 100*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(chromeCtx, 1000*time.Second)
 	defer cancel()
 
 	acts := []chromedp.Action{
 		chromedp.Navigate(url),
-		chromedp.WaitVisible(selector),
-		chromedp.OuterHTML(jsPath, &html, chromedp.ByJSPath),
+		chromedp.Sleep(200 * time.Millisecond),
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			node, err := dom.GetDocument().Do(ctx)
+			if err != nil {
+				return err
+			}
+			html, err = dom.GetOuterHTML().WithNodeID(node.NodeID).Do(ctx)
+			return err
+		}),
 	}
 
-	acts = append(acts, actions...)
 	err = chromedp.Run(timeoutCtx, acts...)
 
 	if err != nil {
@@ -169,23 +182,19 @@ func visit91Page(url, jsPath, selector string, actions ...chromedp.Action) (html
 func get91pornPageLinks(ctx context.Context, page int) error {
 	hasNextPage := true
 	for i := page; hasNextPage; i++ {
-		nextPage := ""
 		url := fmt.Sprintf("https://91porn.com/v.php?category=rf&viewtype=basic&page=%v", i)
-		html, err := visit91Page(url,
-			`document.querySelector("#wrapper > div.container.container-minheight > div.row > div > div")`,
-			`#wrapper > div.container.container-minheight > div.row > div > div`,
-			chromedp.OuterHTML(`document.querySelector("#paging > div > form > a:nth-child(8)")`, &nextPage, chromedp.ByJSPath))
+		log.Printf("开始提取第%v页内容", i)
+		html, err := visit91Page(url)
 		if err != nil {
 			log.Printf("访问第 %v 页失败\n", i)
 			continue
 		}
-		err = extract91Links(ctx, html)
+		err = extract91Links(ctx, html, &hasNextPage)
 		if err != nil {
-			log.Printf("提取 %v 链接失败, 继续下一页\n", i)
+			log.Printf("提取第%v页链接失败, 继续下一页\n", i)
 		} else {
-			log.Printf("提取 %v 成功，即将开始下一页\n", i)
+			log.Printf("提取第%v页成功，即将开始下一页\n", i)
 		}
-		hasNextPage = len(nextPage) > 0
 	}
 
 	return nil

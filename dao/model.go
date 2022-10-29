@@ -58,17 +58,13 @@ func InitDB() {
 	DB = db
 }
 
-func (r *M3U8Resource) Any(conds ...interface{}) bool {
+func Any(r interface{}, conds ...interface{}) bool {
 	result := DB.First(r, conds...)
 	return errors.Is(result.Error, gorm.ErrRecordNotFound)
 }
 
-func (r *M3U8Resource) Create(conds ...interface{}) {
+func Create(r interface{}, conds ...interface{}) {
 	DB.FirstOrCreate(r, conds...)
-}
-
-func (r *M3U8Resource) Save() {
-	DB.Save(r)
 }
 
 func (r *M3U8Resource) String() string {

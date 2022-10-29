@@ -51,7 +51,7 @@ func getTankPageLinks(start int) (err error) {
 					link = tankHost.JoinPath(link).String()
 					model := &tankModel{}
 					model.Ref = sql.NullString{String: link, Valid: true}
-					if !model.Any("ref = ?", link) && len(model.Url) > 0 {
+					if !dao.Any(model, "ref = ?", link) && len(model.Url) > 0 {
 						log.Printf("有数据，跳过: %v", link)
 						return
 					}
@@ -61,7 +61,7 @@ func getTankPageLinks(start int) (err error) {
 					model.Name = sql.NullString{String: name, Valid: true}
 					model.Ref = sql.NullString{String: link, Valid: true}
 					model.Tags = []sql.NullString{{tag, true}}
-					model.Create()
+					dao.Create(model)
 					models = append(models, model)
 				})
 		},
