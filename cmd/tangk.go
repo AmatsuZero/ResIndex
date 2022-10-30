@@ -3,7 +3,7 @@ package cmd
 import (
 	"ResIndex/dao"
 	"ResIndex/utils"
-	"bufio"
+	"context"
 	"database/sql"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 	"log"
 	"net/url"
-	"os"
 	"sync"
 )
 
@@ -23,7 +22,7 @@ type tankModel struct {
 	dao.M3U8Resource
 }
 
-func getTankPageLinks(start int) (err error) {
+func getTankPageLinks(ctx context.Context, start int) (err error) {
 	log.SetPrefix("Tank ")
 
 	tankHost, err = url.Parse("https://vip.tangk2.com")
@@ -75,7 +74,7 @@ func getTankPageLinks(start int) (err error) {
 					page++
 				}
 			})
-		updateTankDetailPages(models)
+		updateTankDetailPages(ctx, models)
 		// 保存
 		dao.DB.Save(&models)
 	}
@@ -84,8 +83,9 @@ func getTankPageLinks(start int) (err error) {
 }
 
 // 更新详情页
-func updateTankDetailPages(models []*tankModel) {
-	ch := make(chan struct{}, 10)
+func updateTankDetailPages(ctx context.Context, models []*tankModel) {
+	concurrent := ctx.Value("concurrent").(int)
+	ch := make(chan struct{}, concurrent)
 	wg := &sync.WaitGroup{}
 
 	for _, model := range models {
@@ -116,22 +116,10 @@ func updateTankDetailPages(models []*tankModel) {
 }
 
 func exportTankPagesList(output string) {
-	fo, err := os.Create(output)
-	if err != nil {
-		log.Fatalf("创建文件失败: %v", err)
-	}
-
-	defer func(fo *os.File) {
-		err = fo.Close()
-		if err != nil {
-			log.Panicf("关闭文件失败: %v", err)
-		}
-	}(fo)
-
 	var records []*tankModel
 	dao.DB.Find(&records)
 
-	playlist := m3u.Playlist{}
+	playlist := &m3u.Playlist{}
 
 	for _, record := range records {
 		track := m3u.Track{
@@ -153,15 +141,16 @@ func exportTankPagesList(output string) {
 		playlist.Tracks = append(playlist.Tracks, track)
 	}
 
-	w := bufio.NewWriter(fo)
-	err = m3u.MarshallInto(playlist, w)
+	err := utils.Export(output, playlist)
 	if err != nil {
 		log.Fatalf("生成 m3u 文件失败: %v", err)
+	} else {
+		log.Printf("生成 m3u 文件到 %v", output)
 	}
 }
 
 func Tank() *cobra.Command {
-	page := new(int)
+	page, cnt := new(int), new(int)
 	migrate := func(cmd *cobra.Command, args []string) {
 		err := dao.DB.AutoMigrate(&tankModel{})
 		if err != nil {
@@ -169,12 +158,14 @@ func Tank() *cobra.Command {
 		}
 	}
 
+	ctx := context.Background()
 	cmd := &cobra.Command{
 		Use:    "tank",
 		Short:  "坦克资源网资源爬取",
 		PreRun: migrate,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := getTankPageLinks(*page)
+			ctx = context.WithValue(ctx, "concurrent", *cnt)
+			err := getTankPageLinks(ctx, *page)
 			if err != nil {
 				log.Fatalf("解析失败 : %v", err)
 			}
@@ -192,6 +183,7 @@ func Tank() *cobra.Command {
 	}
 	exportCmd.Flags().StringVarP(&output, "output", "o", "", "导出路径")
 	_ = exportCmd.MarkFlagRequired("output")
+	cnt = cmd.Flags().IntP("concurrent", "c", 10, "指定并发数量")
 	page = cmd.Flags().IntP("page", "p", 1, "指定起始页码")
 	cmd.AddCommand(exportCmd)
 

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"ResIndex/dao"
+	"ResIndex/utils"
 	"context"
 	"database/sql"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
+	"github.com/jamesnetherton/m3u"
 	"github.com/spf13/cobra"
 	"log"
 	"math/rand"
@@ -70,6 +72,7 @@ func extract91Links(ctx context.Context, htmlContent string, hasNextPage *bool) 
 		models = append(models, model)
 	})
 
+	*hasNextPage = false
 	document.Find("#paging > div > form").Children().EachWithBreak(func(i int, selection *goquery.Selection) bool {
 		txt := selection.Text()
 		if txt == "»" {
@@ -217,6 +220,56 @@ func genIpaddr() string {
 	return ip
 }
 
+func parseDuration(st string) (int, error) {
+	var m, s int
+	_, err := fmt.Sscanf(st, "%d:%d", &m, &s)
+	return m*60 + s, err
+}
+
+func export91PageLinks(output string) {
+	var records []*ninetyOneVideo
+	dao.DB.Find(&records)
+
+	playlist := &m3u.Playlist{}
+
+	for _, record := range records {
+		track := m3u.Track{
+			URI: record.Url,
+		}
+		if record.Name.Valid {
+			track.Name = record.Name.String
+		}
+		var tags []m3u.Tag
+		for _, tag := range record.Tags {
+			if tag.Valid {
+				tags = append(tags, m3u.Tag{
+					Name:  "分类",
+					Value: tag.String,
+				})
+			}
+		}
+		if len(record.Author) > 0 {
+			tags = append(tags, m3u.Tag{
+				Name:  "作者",
+				Value: record.Author,
+			})
+		}
+		dur, err := parseDuration(record.Duration)
+		if err == nil {
+			track.Length = dur
+		}
+		track.Tags = tags
+		playlist.Tracks = append(playlist.Tracks, track)
+	}
+
+	err := utils.Export(output, playlist)
+	if err != nil {
+		log.Fatalf("生成 m3u 文件失败: %v", err)
+	} else {
+		log.Printf("生成 m3u 文件到 %v", output)
+	}
+}
+
 func NinetyOne() *cobra.Command {
 	migrate := func(cmd *cobra.Command, args []string) {
 		err := dao.DB.AutoMigrate(&ninetyOneVideo{})
@@ -243,7 +296,21 @@ func NinetyOne() *cobra.Command {
 			}
 		},
 	}
+
+	output := ""
+	exportCmd := &cobra.Command{
+		Use:    "export",
+		Short:  "导出为 m3u 格式",
+		PreRun: migrate,
+		Run: func(cmd *cobra.Command, args []string) {
+			export91PageLinks(output)
+		},
+	}
+
+	exportCmd.Flags().StringVarP(&output, "output", "o", "", "导出路径")
 	page = cmd.Flags().IntP("page", "p", 1, "指定起始页码")
 	cnt = cmd.Flags().IntP("concurrent", "c", 5, "指定并发数量")
+	cmd.AddCommand(exportCmd)
+
 	return cmd
 }
