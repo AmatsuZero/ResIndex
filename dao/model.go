@@ -63,8 +63,8 @@ func Any(r interface{}, conds ...interface{}) bool {
 	return errors.Is(result.Error, gorm.ErrRecordNotFound)
 }
 
-func Create(r interface{}, conds ...interface{}) {
-	DB.FirstOrCreate(r, conds...)
+func Create(r interface{}) {
+	DB.Create(r)
 }
 
 func (r *M3U8Resource) String() string {
