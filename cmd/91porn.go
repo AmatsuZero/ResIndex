@@ -270,6 +270,27 @@ func export91PageLinks(output string) {
 	}
 }
 
+func download91Resources(exe, output string, concurrent int) {
+	var records []*ninetyOneVideo
+	dao.DB.Find(&records)
+
+	ch := make(chan struct{}, concurrent)
+	wg := &sync.WaitGroup{}
+
+	for _, record := range records {
+		wg.Add(1)
+		ch <- struct{}{}
+
+		go func(r *ninetyOneVideo) {
+			defer wg.Done()
+			r.Download(exe, output)
+			<-ch
+		}(record)
+	}
+
+	wg.Wait()
+}
+
 func NinetyOne() *cobra.Command {
 	migrate := func(cmd *cobra.Command, args []string) {
 		err := dao.DB.AutoMigrate(&ninetyOneVideo{})
@@ -278,7 +299,7 @@ func NinetyOne() *cobra.Command {
 		}
 	}
 
-	page, cnt := new(int), new(int)
+	page, concurrent := new(int), new(int)
 
 	ctx := context.Background()
 	cmd := &cobra.Command{
@@ -286,7 +307,7 @@ func NinetyOne() *cobra.Command {
 		Short:  "91 porn 资源爬取",
 		PreRun: migrate,
 		Run: func(cmd *cobra.Command, args []string) {
-			ctx = context.WithValue(ctx, "concurrent", *cnt)
+			ctx = context.WithValue(ctx, "concurrent", *concurrent)
 			log.SetPrefix("91porn ")
 			err := get91pornPageLinks(ctx, *page)
 			if err != nil {
@@ -307,10 +328,29 @@ func NinetyOne() *cobra.Command {
 		},
 	}
 
+	downloadDir, downloadCurrent, execPath := "", new(int), ""
+	downloadCmd := &cobra.Command{
+		Use:    "download",
+		Short:  "下载资源",
+		PreRun: migrate,
+		Run: func(cmd *cobra.Command, args []string) {
+			download91Resources(execPath, downloadDir, *downloadCurrent)
+		},
+	}
+
 	exportCmd.Flags().StringVarP(&output, "output", "o", "", "导出路径")
+	_ = exportCmd.MarkFlagRequired("output")
+
 	page = cmd.Flags().IntP("page", "p", 1, "指定起始页码")
-	cnt = cmd.Flags().IntP("concurrent", "c", 5, "指定并发数量")
+	concurrent = cmd.Flags().IntP("concurrent", "c", 5, "指定并发数量")
+
+	downloadCmd.Flags().StringVarP(&downloadDir, "dir", "d", "", "下载文件夹")
+	_ = downloadCmd.MarkFlagRequired("dir")
+	downloadCurrent = downloadCmd.Flags().IntP("concurrent", "c", 3, "下载并发数")
+	downloadCmd.Flags().StringVarP(&execPath, "exec", "e", "m3u8-downloader", "指定下载器路径")
+
 	cmd.AddCommand(exportCmd)
+	cmd.AddCommand(downloadCmd)
 
 	return cmd
 }

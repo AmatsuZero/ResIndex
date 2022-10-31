@@ -1,6 +1,7 @@
 package dao
 
 import (
+	"ResIndex/utils"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -69,4 +70,23 @@ func Create(r interface{}) {
 
 func (r *M3U8Resource) String() string {
 	return fmt.Sprintf("link： %v, name: %v tag: %v", r.Url, r.Name, r.Tags)
+}
+
+func (r *M3U8Resource) Download(exe, output string) {
+	args := []string{
+		"--headless",
+		"-downloadDir", output,
+		"parse", "-u", r.Url,
+	}
+
+	if r.Name.Valid {
+		args = append(args, "-n", r.Name.String)
+	}
+
+	msg, err := utils.Cmd(exe, args)
+	if err != nil {
+		log.Printf("下载成功: %v", msg)
+	} else {
+		log.Printf("下载失败: %v", err)
+	}
 }

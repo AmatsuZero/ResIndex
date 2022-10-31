@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/jamesnetherton/m3u"
@@ -9,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"sync"
 )
 
@@ -60,4 +62,18 @@ func Export(output string, playlist *m3u.Playlist) error {
 	w := bufio.NewWriter(fo)
 	err = m3u.MarshallInto(*playlist, w)
 	return err
+}
+
+func Cmd(commandName string, params []string) (string, error) {
+	cmd := exec.Command(commandName, params...)
+	//fmt.Println("Cmd", cmd.Args)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = os.Stderr
+	err := cmd.Start()
+	if err != nil {
+		return "", err
+	}
+	err = cmd.Wait()
+	return out.String(), err
 }
