@@ -336,6 +336,10 @@ func NinetyOne() *cobra.Command {
 		PreRun: migrate,
 		Run: func(cmd *cobra.Command, args []string) {
 			log.SetPrefix("91porn ")
+			err := utils.MakeDirSafely(downloadDir)
+			if err != nil {
+				log.Fatalf("创建文件夹失败: %v", err)
+			}
 			download91Resources(execPath, downloadDir, *downloadCurrent)
 		},
 	}

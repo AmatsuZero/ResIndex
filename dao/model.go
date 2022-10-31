@@ -33,11 +33,9 @@ func InitDB() {
 		appFolder = os.Getenv("APPDATA")
 	}
 	appFolder = filepath.Join(appFolder, "M3U8-Downloader-GO")
-	if _, err := os.Stat(appFolder); errors.Is(err, os.ErrNotExist) {
-		err = os.Mkdir(appFolder, os.ModePerm)
-		if err != nil {
-			return
-		}
+	err := utils.MakeDirSafely(appFolder)
+	if err != nil {
+		log.Fatalf("创建文件夹失败，错误：%v", err)
 	}
 
 	newLogger := logger.New(
@@ -81,7 +79,12 @@ func (r *M3U8Resource) Download(exe, output string) {
 	}
 
 	if r.Name.Valid {
-		args = append(args, "-n", r.Name.String)
+		n := r.Name.String
+		p := filepath.Join(output, n)
+		if utils.IsPathExist(p) { // 检查文件是不是已经有同名文件了
+			n += fmt.Sprintf("(%v)", r.ID)
+		}
+		args = append(args, "-n", n)
 	}
 
 	msg, err := utils.Cmd(exe, args)

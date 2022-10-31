@@ -3,6 +3,7 @@ package utils
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/jamesnetherton/m3u"
@@ -76,4 +77,19 @@ func Cmd(commandName string, params []string) (string, error) {
 	}
 	err = cmd.Wait()
 	return out.String(), err
+}
+
+func IsPathExist(p string) bool {
+	_, err := os.Stat(p)
+	return errors.Is(err, os.ErrNotExist)
+}
+
+func MakeDirSafely(p string) error {
+	if _, err := os.Stat(p); errors.Is(err, os.ErrNotExist) {
+		err = os.Mkdir(p, os.ModePerm)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
