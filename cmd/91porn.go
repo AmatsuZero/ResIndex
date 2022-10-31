@@ -6,17 +6,18 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
+	"math/rand"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
 	"github.com/jamesnetherton/m3u"
 	"github.com/spf13/cobra"
-	"log"
-	"math/rand"
-	"strings"
-	"sync"
-	"time"
 )
 
 type ninetyOneVideo struct {
@@ -334,6 +335,7 @@ func NinetyOne() *cobra.Command {
 		Short:  "下载资源",
 		PreRun: migrate,
 		Run: func(cmd *cobra.Command, args []string) {
+			log.SetPrefix("91porn ")
 			download91Resources(execPath, downloadDir, *downloadCurrent)
 		},
 	}

@@ -5,13 +5,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 	"log"
 	"os"
 	"path/filepath"
 	"time"
+
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type M3U8Resource struct {
@@ -75,7 +76,7 @@ func (r *M3U8Resource) String() string {
 func (r *M3U8Resource) Download(exe, output string) {
 	args := []string{
 		"--headless",
-		"-downloadDir", output,
+		"--downloadDir", output,
 		"parse", "-u", r.Url,
 	}
 
@@ -84,7 +85,7 @@ func (r *M3U8Resource) Download(exe, output string) {
 	}
 
 	msg, err := utils.Cmd(exe, args)
-	if err != nil {
+	if err == nil {
 		log.Printf("下载成功: %v", msg)
 	} else {
 		log.Printf("下载失败: %v", err)
