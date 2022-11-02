@@ -1,0 +1,4 @@
+[submodule "browser/dist"]
+	path = browser/dist
+	url = git@github.com:AmatsuZero/NewRound.git
+	branch = production
