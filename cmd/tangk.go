@@ -18,7 +18,7 @@ var tankHost *url.URL
 
 const tangkBaseUrl = "index.php/index/index/page"
 
-type tankModel struct {
+type TankModel struct {
 	dao.M3U8Resource
 }
 
@@ -35,7 +35,7 @@ func getTankPageLinks(ctx context.Context, start int) (err error) {
 
 	shouldStop := false
 	for !shouldStop {
-		var models []*tankModel
+		var models []*TankModel
 		log.Printf("第%v页解析开始\n", page)
 		utils.GetDocument(u.String(), func(doc *goquery.Document) { // 解析有多少页
 			// 找到 tbbody
@@ -48,7 +48,7 @@ func getTankPageLinks(ctx context.Context, start int) (err error) {
 						return
 					}
 					link = tankHost.JoinPath(link).String()
-					model := &tankModel{}
+					model := &TankModel{}
 					model.Ref = sql.NullString{String: link, Valid: true}
 					if !dao.Any(model, "ref = ?", link) && len(model.Url) > 0 {
 						log.Printf("有数据，跳过: %v", link)
@@ -83,7 +83,7 @@ func getTankPageLinks(ctx context.Context, start int) (err error) {
 }
 
 // 更新详情页
-func updateTankDetailPages(ctx context.Context, models []*tankModel) {
+func updateTankDetailPages(ctx context.Context, models []*TankModel) {
 	concurrent := ctx.Value("concurrent").(int)
 	ch := make(chan struct{}, concurrent)
 	wg := &sync.WaitGroup{}
@@ -96,7 +96,7 @@ func updateTankDetailPages(ctx context.Context, models []*tankModel) {
 		wg.Add(1)
 		ch <- struct{}{}
 
-		go func(m *tankModel) {
+		go func(m *TankModel) {
 			defer wg.Done()
 			utils.GetDocument(m.Ref.String, func(doc *goquery.Document) { // 找到 m3u8 资源链接
 				val, ok := doc.Find("body > main > section.dy-collect > div > div:nth-child(2) > ul > li > a:nth-child(4)").Attr("href")
@@ -116,7 +116,7 @@ func updateTankDetailPages(ctx context.Context, models []*tankModel) {
 }
 
 func exportTankPagesList(output string) {
-	var records []*tankModel
+	var records []*TankModel
 	dao.DB.Find(&records)
 
 	playlist := &m3u.Playlist{}
@@ -152,7 +152,7 @@ func exportTankPagesList(output string) {
 func Tank() *cobra.Command {
 	page, cnt := new(int), new(int)
 	migrate := func(cmd *cobra.Command, args []string) {
-		err := dao.DB.AutoMigrate(&tankModel{})
+		err := dao.DB.AutoMigrate(&TankModel{})
 		if err != nil {
 			log.Panicf("自动迁移失败: %v", err)
 		}

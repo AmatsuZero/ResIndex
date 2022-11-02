@@ -20,7 +20,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type ninetyOneVideo struct {
+type NinetyOneVideo struct {
 	dao.M3U8Resource
 	Author, Duration string
 }
@@ -32,9 +32,9 @@ func extract91Links(ctx context.Context, htmlContent string, hasNextPage *bool) 
 	}
 
 	rows := document.Find("#wrapper > div.container.container-minheight > div.row > div > div").Children()
-	models := make([]*ninetyOneVideo, 0, rows.Length())
+	models := make([]*NinetyOneVideo, 0, rows.Length())
 	rows.Each(func(i int, selection *goquery.Selection) {
-		model := &ninetyOneVideo{}
+		model := &NinetyOneVideo{}
 		sel := selection.Find(".well.well-sm.videos-text-align")
 		a := sel.Find("a")
 		ref, ok := a.Attr("href")
@@ -86,7 +86,7 @@ func extract91Links(ctx context.Context, htmlContent string, hasNextPage *bool) 
 	return update91PornDetails(ctx, models)
 }
 
-func update91PornDetails(ctx context.Context, models []*ninetyOneVideo) error {
+func update91PornDetails(ctx context.Context, models []*NinetyOneVideo) error {
 	concurrent := ctx.Value("concurrent").(int)
 	ch := make(chan struct{}, concurrent)
 	wg := &sync.WaitGroup{}
@@ -95,7 +95,7 @@ func update91PornDetails(ctx context.Context, models []*ninetyOneVideo) error {
 		wg.Add(1)
 		ch <- struct{}{}
 
-		go func(model *ninetyOneVideo) {
+		go func(model *NinetyOneVideo) {
 			defer wg.Done()
 
 			if !model.Ref.Valid {
@@ -228,7 +228,7 @@ func parseDuration(st string) (int, error) {
 }
 
 func export91PageLinks(output string) {
-	var records []*ninetyOneVideo
+	var records []*NinetyOneVideo
 	dao.DB.Find(&records)
 
 	playlist := &m3u.Playlist{}
@@ -272,7 +272,7 @@ func export91PageLinks(output string) {
 }
 
 func download91Resources(exe, output string, concurrent int) {
-	var records []*ninetyOneVideo
+	var records []*NinetyOneVideo
 	dao.DB.Find(&records)
 
 	ch := make(chan struct{}, concurrent)
@@ -282,7 +282,7 @@ func download91Resources(exe, output string, concurrent int) {
 		wg.Add(1)
 		ch <- struct{}{}
 
-		go func(r *ninetyOneVideo) {
+		go func(r *NinetyOneVideo) {
 			defer wg.Done()
 			r.Download(exe, output)
 			<-ch
@@ -294,7 +294,7 @@ func download91Resources(exe, output string, concurrent int) {
 
 func NinetyOne() *cobra.Command {
 	migrate := func(cmd *cobra.Command, args []string) {
-		err := dao.DB.AutoMigrate(&ninetyOneVideo{})
+		err := dao.DB.AutoMigrate(&NinetyOneVideo{})
 		if err != nil {
 			log.Panicf("自动迁移失败: %v", err)
 		}
