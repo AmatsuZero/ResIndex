@@ -121,7 +121,7 @@ func update91PornDetails(ctx context.Context, models []*NinetyOneVideo) error {
 			}
 
 			// 提取时间
-			t := document.Find("#videodetails-content > div:nth-child(1) > span.info").Text()
+			t := document.Find("#videodetails-content > div:nth-child(1) > span.title-yakov").Text()
 			tt, e := time.ParseInLocation(form, t, loc)
 			if e == nil {
 				model.AddedAt = tt
