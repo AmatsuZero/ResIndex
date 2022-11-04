@@ -15,10 +15,10 @@ import (
 	"sync"
 )
 
-func GetDocument(url string, extractor ...func(doc *goquery.Document)) {
+func GetDocument(url string, extractor ...func(doc *goquery.Document)) error {
 	res, err := http.Get(url)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
@@ -26,14 +26,15 @@ func GetDocument(url string, extractor ...func(doc *goquery.Document)) {
 			fmt.Println(err)
 		}
 	}(res.Body)
+
 	if res.StatusCode != 200 {
-		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
+		return fmt.Errorf("status code error: %d %s", res.StatusCode, res.Status)
 	}
 
 	// Load the HTML document
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
-		return
+		return err
 	}
 
 	wg := &sync.WaitGroup{}
@@ -45,6 +46,8 @@ func GetDocument(url string, extractor ...func(doc *goquery.Document)) {
 		}(f)
 	}
 	wg.Wait()
+
+	return nil
 }
 
 func Export(output string, playlist *m3u.Playlist) error {

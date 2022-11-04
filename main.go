@@ -15,6 +15,11 @@ func initConfig() {
 func main() {
 	cobra.OnInitialize(initConfig)
 	rootCmd := &cobra.Command{Use: "index"}
-	rootCmd.AddCommand(cmd.Tank(), cmd.NinetyOne(), browser.Cmd())
+	rootCmd.AddCommand(
+		cmd.Tank(),
+		cmd.NinetyOne(),
+		cmd.EHentai(),
+		browser.Cmd(),
+	)
 	_ = rootCmd.Execute()
 }

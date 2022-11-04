@@ -50,7 +50,7 @@ func getTankPageLinks(ctx context.Context, start int) (err error) {
 	for !shouldStop {
 		var models []*TankModel
 		log.Printf("第%v页解析开始\n", page)
-		utils.GetDocument(u.String(), func(doc *goquery.Document) { // 解析有多少页
+		e := utils.GetDocument(u.String(), func(doc *goquery.Document) { // 解析有多少页
 			loc, _ := time.LoadLocation("Asia/Shanghai")
 			const form = "2006-01-02 15:04:05"
 			// 找到 tbbody
@@ -94,6 +94,10 @@ func getTankPageLinks(ctx context.Context, start int) (err error) {
 					page++
 				}
 			})
+		if e != nil {
+			log.Printf("提取页面内容出错：%v", e)
+			continue
+		}
 		updateTankDetailPages(ctx, models)
 		// 保存
 		dao.DB.Save(&models)
@@ -116,10 +120,9 @@ func updateTankDetailPages(ctx context.Context, models []*TankModel) {
 		wg.Add(1)
 		ch <- struct{}{}
 
-		model := model
 		go func(m *TankModel) {
 			defer wg.Done()
-			utils.GetDocument(m.Ref.String, func(doc *goquery.Document) { // 找到 m3u8 资源链接
+			e := utils.GetDocument(m.Ref.String, func(doc *goquery.Document) { // 找到 m3u8 资源链接
 				val, ok := doc.Find("body > main > section.dy-collect > div > div:nth-child(2) > ul > li > a:nth-child(4)").Attr("href")
 				if ok {
 					updateTankPageDuration(val, m)
@@ -130,6 +133,9 @@ func updateTankDetailPages(ctx context.Context, models []*TankModel) {
 					m.Thumbnail = sql.NullString{String: tankHost.JoinPath(img).String(), Valid: true}
 				}
 			})
+			if e != nil {
+				log.Printf("提取页面出错 %v\n", e)
+			}
 			<-ch
 		}(model)
 	}
