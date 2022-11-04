@@ -6,8 +6,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/grafov/m3u8"
 	"log"
+	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -29,6 +32,7 @@ const (
 type TankModel struct {
 	dao.M3U8Resource
 	UpdateTime time.Time
+	Duration   float64
 }
 
 func getTankPageLinks(ctx context.Context, start int) (err error) {
@@ -66,7 +70,7 @@ func getTankPageLinks(ctx context.Context, start int) (err error) {
 					tag := selection.Find(fmt.Sprintf("body > main > div > div > a > table > tbody > tr:nth-child(%v) > td:nth-child(3)", i+1)).Text()
 					model.Name = sql.NullString{String: name, Valid: true}
 					model.Ref = sql.NullString{String: link, Valid: true}
-					model.Tags = []sql.NullString{{String: tag, Valid: true}}
+					model.Tags = tag
 					if !donCreate {
 						dao.Create(model)
 					}
@@ -112,12 +116,13 @@ func updateTankDetailPages(ctx context.Context, models []*TankModel) {
 		wg.Add(1)
 		ch <- struct{}{}
 
+		model := model
 		go func(m *TankModel) {
 			defer wg.Done()
 			utils.GetDocument(m.Ref.String, func(doc *goquery.Document) { // 找到 m3u8 资源链接
 				val, ok := doc.Find("body > main > section.dy-collect > div > div:nth-child(2) > ul > li > a:nth-child(4)").Attr("href")
 				if ok {
-					m.Url = val
+					updateTankPageDuration(val, m)
 				}
 			}, func(doc *goquery.Document) { // 找到预览图
 				img, ok := doc.Find("body > main > section.dy-ins > div > div.detailed > div > div.dy-photo > img").Attr("src")
@@ -129,6 +134,44 @@ func updateTankDetailPages(ctx context.Context, models []*TankModel) {
 		}(model)
 	}
 	wg.Wait()
+}
+
+func updateTankPageDuration(u string, model *TankModel) {
+	resp, err := http.Get(u)
+	if err != nil {
+		log.Printf("访问资源地址失败: %v\n", err)
+		return
+	}
+
+	list, t, err := m3u8.DecodeFrom(resp.Body, false)
+	if err != nil {
+		log.Printf("解析资源地址失败: %v\n", err)
+		return
+	}
+
+	if len(model.Url) == 0 {
+		model.Url = u
+	}
+	model.Duration = 0
+	if t == m3u8.MEDIA {
+		mediaList := list.(*m3u8.MediaPlaylist)
+		for _, segment := range mediaList.Segments {
+			if segment != nil {
+				model.Duration += segment.Duration
+			}
+		}
+	} else if t == m3u8.MASTER {
+		masterList := list.(*m3u8.MasterPlaylist)
+		if len(masterList.Variants) > 0 {
+			chunk := masterList.Variants[0].Chunklist
+			if chunk != nil {
+				model.Duration += chunk.TargetDuration
+			} else {
+				uu, _ := url.Parse(model.Url)
+				updateTankPageDuration(uu.Scheme+"://"+uu.Host+masterList.Variants[0].URI, model)
+			}
+		}
+	}
 }
 
 func exportTankPagesList(output string) {
@@ -144,12 +187,18 @@ func exportTankPagesList(output string) {
 		if record.Name.Valid {
 			track.Name = record.Name.String
 		}
+
+		if record.Duration > 0 {
+			track.Length = int(record.Duration)
+		}
+
 		var tags []m3u.Tag
-		for _, tag := range record.Tags {
-			if tag.Valid {
+		if len(record.Tags) > 0 {
+			arr := strings.Split(record.Tags, ",")
+			for _, s := range arr {
 				tags = append(tags, m3u.Tag{
 					Name:  "分类",
-					Value: tag.String,
+					Value: s,
 				})
 			}
 		}

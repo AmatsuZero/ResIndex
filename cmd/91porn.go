@@ -248,11 +248,12 @@ func export91PageLinks(output string) {
 			track.Name = record.Name.String
 		}
 		var tags []m3u.Tag
-		for _, tag := range record.Tags {
-			if tag.Valid {
+		if len(record.Tags) > 0 {
+			arr := strings.Split(record.Tags, ",")
+			for _, s := range arr {
 				tags = append(tags, m3u.Tag{
 					Name:  "分类",
-					Value: tag.String,
+					Value: s,
 				})
 			}
 		}
