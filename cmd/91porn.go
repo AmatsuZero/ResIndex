@@ -85,7 +85,7 @@ func extract91Links(ctx context.Context, htmlContent string, hasNextPage *bool) 
 }
 
 func update91PornDetails(ctx context.Context, models []*NinetyOneVideo) error {
-	concurrent := ctx.Value("concurrent").(int)
+	concurrent := ctx.Value(concurrentKey).(int)
 	ch := make(chan struct{}, concurrent)
 	wg := &sync.WaitGroup{}
 	const form = "2006-01-02"
@@ -315,7 +315,7 @@ func NinetyOne() *cobra.Command {
 		Short:  "91 porn 资源爬取",
 		PreRun: migrate,
 		Run: func(cmd *cobra.Command, args []string) {
-			ctx = context.WithValue(ctx, "concurrent", *concurrent)
+			ctx = context.WithValue(ctx, concurrentKey, *concurrent)
 			log.SetPrefix("91porn ")
 			err := get91pornPageLinks(ctx, *page)
 			if err != nil {

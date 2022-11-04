@@ -6,18 +6,25 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/PuerkitoBio/goquery"
-	"github.com/jamesnetherton/m3u"
-	"github.com/spf13/cobra"
 	"log"
 	"net/url"
 	"sync"
 	"time"
+
+	"github.com/PuerkitoBio/goquery"
+	"github.com/jamesnetherton/m3u"
+	"github.com/spf13/cobra"
 )
 
 var tankHost *url.URL
 
 const tangkBaseUrl = "index.php/index/index/page"
+
+type ContextKey string
+
+const (
+	concurrentKey ContextKey = "concurrent"
+)
 
 type TankModel struct {
 	dao.M3U8Resource
@@ -59,7 +66,7 @@ func getTankPageLinks(ctx context.Context, start int) (err error) {
 					tag := selection.Find(fmt.Sprintf("body > main > div > div > a > table > tbody > tr:nth-child(%v) > td:nth-child(3)", i+1)).Text()
 					model.Name = sql.NullString{String: name, Valid: true}
 					model.Ref = sql.NullString{String: link, Valid: true}
-					model.Tags = []sql.NullString{{tag, true}}
+					model.Tags = []sql.NullString{{String: tag, Valid: true}}
 					if !donCreate {
 						dao.Create(model)
 					}
@@ -93,7 +100,7 @@ func getTankPageLinks(ctx context.Context, start int) (err error) {
 
 // 更新详情页
 func updateTankDetailPages(ctx context.Context, models []*TankModel) {
-	concurrent := ctx.Value("concurrent").(int)
+	concurrent := ctx.Value(concurrentKey).(int)
 	ch := make(chan struct{}, concurrent)
 	wg := &sync.WaitGroup{}
 
@@ -173,7 +180,7 @@ func Tank() *cobra.Command {
 		Short:  "坦克资源网资源爬取",
 		PreRun: migrate,
 		Run: func(cmd *cobra.Command, args []string) {
-			ctx = context.WithValue(ctx, "concurrent", *cnt)
+			ctx = context.WithValue(ctx, concurrentKey, *cnt)
 			err := getTankPageLinks(ctx, *page)
 			if err != nil {
 				log.Fatalf("解析失败 : %v", err)
@@ -192,7 +199,7 @@ func Tank() *cobra.Command {
 	}
 	exportCmd.Flags().StringVarP(&output, "output", "o", "", "导出路径")
 	_ = exportCmd.MarkFlagRequired("output")
-	cnt = cmd.Flags().IntP("concurrent", "c", 10, "指定并发数量")
+	cnt = cmd.Flags().IntP(string(concurrentKey), "c", 10, "指定并发数量")
 	page = cmd.Flags().IntP("page", "p", 1, "指定起始页码")
 	cmd.AddCommand(exportCmd)
 
