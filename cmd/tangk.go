@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/url"
 	"sync"
+	"time"
 )
 
 var tankHost *url.URL
@@ -20,6 +21,7 @@ const tangkBaseUrl = "index.php/index/index/page"
 
 type TankModel struct {
 	dao.M3U8Resource
+	UpdateTime time.Time
 }
 
 func getTankPageLinks(ctx context.Context, start int) (err error) {
@@ -38,6 +40,8 @@ func getTankPageLinks(ctx context.Context, start int) (err error) {
 		var models []*TankModel
 		log.Printf("第%v页解析开始\n", page)
 		utils.GetDocument(u.String(), func(doc *goquery.Document) { // 解析有多少页
+			loc, _ := time.LoadLocation("Asia/Shanghai")
+			const form = "2006-01-02 15:04:05"
 			// 找到 tbbody
 			doc.Find("body > main > div > div > a > table > tbody").
 				Children().
@@ -50,17 +54,22 @@ func getTankPageLinks(ctx context.Context, start int) (err error) {
 					link = tankHost.JoinPath(link).String()
 					model := &TankModel{}
 					model.Ref = sql.NullString{String: link, Valid: true}
-					if !dao.Any(model, "ref = ?", link) && len(model.Url) > 0 {
-						log.Printf("有数据，跳过: %v", link)
-						return
-					}
-
+					donCreate := !dao.Any(model, "ref = ?", link) && len(model.Url) > 0
 					name := td.Text()
 					tag := selection.Find(fmt.Sprintf("body > main > div > div > a > table > tbody > tr:nth-child(%v) > td:nth-child(3)", i+1)).Text()
 					model.Name = sql.NullString{String: name, Valid: true}
 					model.Ref = sql.NullString{String: link, Valid: true}
 					model.Tags = []sql.NullString{{tag, true}}
-					dao.Create(model)
+					if !donCreate {
+						dao.Create(model)
+					}
+
+					// 提取时间
+					t := doc.Find(fmt.Sprintf("body > main > div > div > a > table > tbody > tr:nth-child(%v) > td:nth-child(5) > span", i+1)).Text()
+					tt, e := time.ParseInLocation(form, t, loc)
+					if e == nil {
+						model.UpdateTime = tt
+					}
 					models = append(models, model)
 				})
 		},

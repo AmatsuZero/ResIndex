@@ -23,6 +23,7 @@ import (
 type NinetyOneVideo struct {
 	dao.M3U8Resource
 	Author, Duration string
+	AddedAt          time.Time
 }
 
 func extract91Links(ctx context.Context, htmlContent string, hasNextPage *bool) error {
@@ -44,11 +45,7 @@ func extract91Links(ctx context.Context, htmlContent string, hasNextPage *bool) 
 			return
 		}
 
-		if !dao.Any(model, "ref = ?", ref) && len(model.Url) > 0 {
-			log.Printf("有数据，跳过: %v\n", ref)
-			return
-		}
-
+		donCreate := !dao.Any(model, "ref = ?", ref) && len(model.Url) > 0
 		title := a.Find(".video-title.title-truncate.m-t-5").Text()
 		model.Name = sql.NullString{String: title, Valid: true}
 
@@ -68,8 +65,9 @@ func extract91Links(ctx context.Context, htmlContent string, hasNextPage *bool) 
 		parts := strings.Split(name, ":")
 		name = strings.TrimSpace(parts[1])
 		model.Author = name
-
-		dao.Create(model)
+		if !donCreate {
+			dao.Create(model)
+		}
 		models = append(models, model)
 	})
 
@@ -90,6 +88,8 @@ func update91PornDetails(ctx context.Context, models []*NinetyOneVideo) error {
 	concurrent := ctx.Value("concurrent").(int)
 	ch := make(chan struct{}, concurrent)
 	wg := &sync.WaitGroup{}
+	const form = "2006-01-02"
+	loc, _ := time.LoadLocation("Asia/Shanghai")
 
 	for _, m := range models {
 		wg.Add(1)
@@ -102,7 +102,7 @@ func update91PornDetails(ctx context.Context, models []*NinetyOneVideo) error {
 				return
 			}
 
-			html, err := visit91Page(model.Ref.String)
+			html, err := Visit91Page(model.Ref.String)
 			<-ch
 
 			if err != nil {
@@ -119,6 +119,13 @@ func update91PornDetails(ctx context.Context, models []*NinetyOneVideo) error {
 			if ok {
 				model.Url = src
 			}
+
+			// 提取时间
+			t := document.Find("#videodetails-content > div:nth-child(1) > span.info").Text()
+			tt, e := time.ParseInLocation(form, t, loc)
+			if e == nil {
+				model.AddedAt = tt
+			}
 		}(m)
 	}
 	wg.Wait()
@@ -127,7 +134,7 @@ func update91PornDetails(ctx context.Context, models []*NinetyOneVideo) error {
 	return nil
 }
 
-func visit91Page(url string) (html string, err error) {
+func Visit91Page(url string) (html string, err error) {
 	options := []chromedp.ExecAllocatorOption{
 		chromedp.Flag("headless", true), // debug使用
 		chromedp.Flag("blink-settings", "imagesEnabled=false"),
@@ -188,7 +195,7 @@ func get91pornPageLinks(ctx context.Context, page int) error {
 	for i := page; hasNextPage; i++ {
 		url := fmt.Sprintf("https://91porn.com/v.php?category=rf&viewtype=basic&page=%v", i)
 		log.Printf("开始提取第%v页内容", i)
-		html, err := visit91Page(url)
+		html, err := Visit91Page(url)
 		if err != nil {
 			log.Printf("访问第 %v 页失败\n", i)
 			continue
