@@ -15,8 +15,22 @@ import (
 	"sync"
 )
 
+var client *http.Client
+
+func SetupWebClient() {
+	client = &http.Client{}
+}
+
 func GetDocument(url string, extractor ...func(doc *goquery.Document)) error {
-	res, err := http.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36")
+	req.Header.Add("Referer", req.URL.Scheme+"://"+req.URL.Host+"/")
+
+	res, err := client.Do(req)
 	if err != nil {
 		return err
 	}

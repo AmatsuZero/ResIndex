@@ -4,12 +4,14 @@ import (
 	"ResIndex/browser"
 	"ResIndex/cmd"
 	"ResIndex/dao"
+	"ResIndex/utils"
 
 	"github.com/spf13/cobra"
 )
 
 func initConfig() {
 	dao.InitDB()
+	utils.SetupWebClient()
 }
 
 func main() {
