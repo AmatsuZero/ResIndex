@@ -23,7 +23,7 @@ func (d *Detail) ExtractInfo() (*InfoModel, error) {
 	}
 	model := &InfoModel{}
 	model.Category = d.Category
-	model.Tag = d.tag
+	model.Tags = d.tag
 
 	msgFont := doc.Find("div.t_msgfont").First()
 	id, _ := msgFont.Attr("id")
@@ -39,7 +39,7 @@ func (d *Detail) ExtractInfo() (*InfoModel, error) {
 	id = id[:idx]
 	model.ThreadId = strings.Split(id, "-")[1]
 
-	if len(model.Title) == 0 || model.Title == "---" {
+	if len(model.Name.String) == 0 || model.Name.String == "---" {
 		model.ExtractNewListModelTitle(doc)
 	}
 	model.TorrentLink, err = d.extractNewListModelTorrentLink(doc, model.PostId)

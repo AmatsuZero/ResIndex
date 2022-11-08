@@ -1,21 +1,22 @@
 package sis001
 
 import (
+	"ResIndex/dao"
+	"database/sql"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
-	"gorm.io/gorm"
 	"path"
 	"regexp"
 	"strings"
 )
 
 type InfoModel struct {
-	gorm.Model
-	ThreadId                                string
-	Title, Format, PostId, Sig, TorrentLink string
-	Category, Tag, Size                     string
-	IsPosted, IsBlurred                     bool
-	Actors, Thumbnails                      string
+	dao.M3U8Resource
+	ThreadId                         string `gorm:"primarykey"`
+	Format, PostId, Sig, TorrentLink string
+	Category, Size                   string
+	IsPosted, IsBlurred              bool
+	Actors, Thumbnails               string
 }
 
 func getSplitValue(str string) string {
@@ -58,7 +59,10 @@ func (i *InfoModel) FillInfo(lines []string) {
 	for _, line := range lines {
 		switch {
 		case strings.Contains(line, "影片名稱"):
-			i.Title = getSplitValue(line)
+			i.Name = sql.NullString{
+				String: getSplitValue(line),
+				Valid:  true,
+			}
 		case strings.Contains(line, "影片格式"):
 			i.Format = getSplitValue(line)
 		case strings.Contains(line, "影片大小"),
@@ -77,7 +81,10 @@ func (i *InfoModel) FillInfo(lines []string) {
 
 func (i *InfoModel) ExtractNewListModelTitle(doc *goquery.Document) {
 	sel := "#pid" + i.PostId + " > tbody > tr:nth-child(1) > td.postcontent > div.postmessage.defaultpost > h2"
-	i.Title = doc.Find(sel).Text()
+	i.Name = sql.NullString{
+		String: doc.Find(sel).Text(),
+		Valid:  true,
+	}
 }
 
 func (i *InfoModel) ExtractNewListModelThumbnail(doc *goquery.Document) {

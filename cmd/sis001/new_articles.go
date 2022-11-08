@@ -19,7 +19,13 @@ func NewArticle() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "nl",
 		Short: "新作品",
-		Run:   createNewList,
+		PreRun: func(cmd *cobra.Command, args []string) {
+			err := dao.DB.AutoMigrate(&InfoModel{})
+			if err != nil {
+				log.Panicf("自动迁移失败: %v", err)
+			}
+		},
+		Run: createNewList,
 	}
 	return cmd
 }
@@ -191,7 +197,7 @@ func (n *NewList) extractDetails(infos []ThreadInfo) []*InfoModel {
 				lock.Lock()
 				output = append(output, model)
 				lock.Unlock()
-				log.Printf(`🍺 解析完成: %v-%v`, ti.tag, model.Title)
+				log.Printf(`🍺 解析完成: %v-%v`, ti.tag, model.Name.String)
 			}
 		}(info)
 	}
