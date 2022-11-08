@@ -21,6 +21,7 @@ func main() {
 		cmd.Tank(),
 		cmd.NinetyOne(),
 		cmd.EHentai(),
+		cmd.Sis(),
 		browser.Cmd(),
 	)
 	_ = rootCmd.Execute()
