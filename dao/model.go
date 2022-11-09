@@ -71,7 +71,7 @@ func (r *M3U8Resource) String() string {
 	return fmt.Sprintf("link： %v, name: %v tag: %v", r.Url, r.Name, r.Tags)
 }
 
-func (r *M3U8Resource) Download(exe, output string) {
+func (r *M3U8Resource) Download(exe, output string) (string, error) {
 	args := []string{
 		"--headless",
 		"--downloadDir", output,
@@ -88,9 +88,5 @@ func (r *M3U8Resource) Download(exe, output string) {
 	}
 
 	msg, err := utils.Cmd(exe, args)
-	if err == nil {
-		log.Printf("下载成功: %v", msg)
-	} else {
-		log.Printf("下载失败: %v", err)
-	}
+	return msg, err
 }

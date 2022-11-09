@@ -5,7 +5,6 @@ import (
 	"ResIndex/cmd"
 	"ResIndex/dao"
 	"ResIndex/utils"
-
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +15,11 @@ func initConfig() {
 
 func main() {
 	cobra.OnInitialize(initConfig)
-	rootCmd := &cobra.Command{Use: "index"}
+
+	rootCmd := &cobra.Command{
+		Use: "index",
+	}
+
 	rootCmd.AddCommand(
 		cmd.Tank(),
 		cmd.NinetyOne(),

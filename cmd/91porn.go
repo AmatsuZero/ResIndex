@@ -2,11 +2,13 @@ package cmd
 
 import (
 	"ResIndex/dao"
+	"ResIndex/telegram"
 	"ResIndex/utils"
 	"context"
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -215,7 +217,12 @@ func download91Resources(exe, output string, concurrent int) {
 
 		go func(r *NinetyOneVideo) {
 			defer wg.Done()
-			r.Download(exe, output)
+			msg, err := r.Download(exe, output)
+			if err == nil {
+				log.Printf("下载成功: %v", msg)
+			} else {
+				log.Printf("下载失败: %v", err)
+			}
 			<-ch
 		}(record)
 	}
@@ -224,22 +231,20 @@ func download91Resources(exe, output string, concurrent int) {
 }
 
 func NinetyOne() *cobra.Command {
-	migrate := func(cmd *cobra.Command, args []string) {
-		err := dao.DB.AutoMigrate(&NinetyOneVideo{})
-		if err != nil {
-			log.Panicf("自动迁移失败: %v", err)
-		}
-	}
-
 	page, concurrent := new(int), new(int)
 
-	ctx := context.Background()
 	cmd := &cobra.Command{
-		Use:    "91",
-		Short:  "91 porn 资源爬取",
-		PreRun: migrate,
+		Use:   "91",
+		Short: "91 porn 资源爬取",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			log.SetPrefix("91porn ")
+			err := dao.DB.AutoMigrate(&NinetyOneVideo{})
+			if err != nil {
+				log.Panicf("自动迁移失败: %v", err)
+			}
+		},
 		Run: func(cmd *cobra.Command, args []string) {
-			ctx = context.WithValue(ctx, concurrentKey, *concurrent)
+			ctx := context.WithValue(cmd.Context(), concurrentKey, *concurrent)
 			log.SetPrefix("91porn ")
 			err := get91pornPageLinks(ctx, *page)
 			if err != nil {
@@ -252,9 +257,8 @@ func NinetyOne() *cobra.Command {
 
 	output := ""
 	exportCmd := &cobra.Command{
-		Use:    "export",
-		Short:  "导出为 m3u 格式",
-		PreRun: migrate,
+		Use:   "export",
+		Short: "导出为 m3u 格式",
 		Run: func(cmd *cobra.Command, args []string) {
 			export91PageLinks(output)
 		},
@@ -262,11 +266,9 @@ func NinetyOne() *cobra.Command {
 
 	downloadDir, downloadCurrent, execPath := "", new(int), ""
 	downloadCmd := &cobra.Command{
-		Use:    "download",
-		Short:  "下载资源",
-		PreRun: migrate,
+		Use:   "download",
+		Short: "下载资源",
 		Run: func(cmd *cobra.Command, args []string) {
-			log.SetPrefix("91porn ")
 			err := utils.MakeDirSafely(downloadDir)
 			if err != nil {
 				log.Fatalf("创建文件夹失败: %v", err)
@@ -288,6 +290,29 @@ func NinetyOne() *cobra.Command {
 
 	cmd.AddCommand(exportCmd)
 	cmd.AddCommand(downloadCmd)
+
+	token, debug := "", new(bool)
+	upload := &cobra.Command{
+		Use:   "upload",
+		Short: "上传至 telegram 机器人频道",
+		Run: func(cmd *cobra.Command, args []string) {
+			ctx := context.WithValue(cmd.Context(), telegram.Token, token)
+			ctx = context.WithValue(ctx, telegram.Debug, *debug)
+			ctx = context.WithValue(ctx, telegram.DownloaderPath, execPath)
+			ctx = context.WithValue(ctx, telegram.ModelType, "91")
+			dir, err := os.MkdirTemp("", "download")
+			if err != nil {
+				log.Fatalln(err)
+			}
+			defer os.RemoveAll(dir)
+			telegram.UploadToChannel(ctx, dir)
+		},
+	}
+
+	upload.Flags().StringVarP(&token, "token", "t", "", "telegram bot 令牌")
+	debug = upload.PersistentFlags().Bool("debug", false, "debug 模式")
+	upload.Flags().StringVarP(&execPath, "exec", "e", "m3u8-downloader", "指定下载器路径")
+	cmd.AddCommand(upload)
 
 	return cmd
 }

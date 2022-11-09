@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"ResIndex/dao"
+	"ResIndex/telegram"
 	"ResIndex/utils"
 	"context"
 	"database/sql"
@@ -10,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -36,8 +38,6 @@ type TankModel struct {
 }
 
 func getTankPageLinks(ctx context.Context, start int) (err error) {
-	log.SetPrefix("Tank ")
-
 	tankHost, err = url.Parse("https://vip.tangk2.com")
 	if err != nil {
 		return err
@@ -222,20 +222,18 @@ func exportTankPagesList(output string) {
 
 func Tank() *cobra.Command {
 	page, cnt := new(int), new(int)
-	migrate := func(cmd *cobra.Command, args []string) {
-		err := dao.DB.AutoMigrate(&TankModel{})
-		if err != nil {
-			log.Panicf("自动迁移失败: %v", err)
-		}
-	}
-
-	ctx := context.Background()
 	cmd := &cobra.Command{
-		Use:    "tank",
-		Short:  "坦克资源网资源爬取",
-		PreRun: migrate,
+		Use:   "tank",
+		Short: "坦克资源网资源爬取",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			log.SetPrefix("Tank ")
+			err := dao.DB.AutoMigrate(&TankModel{})
+			if err != nil {
+				log.Panicf("自动迁移失败: %v", err)
+			}
+		},
 		Run: func(cmd *cobra.Command, args []string) {
-			ctx = context.WithValue(ctx, concurrentKey, *cnt)
+			ctx := context.WithValue(cmd.Context(), concurrentKey, *cnt)
 			err := getTankPageLinks(ctx, *page)
 			if err != nil {
 				log.Fatalf("解析失败 : %v", err)
@@ -245,18 +243,41 @@ func Tank() *cobra.Command {
 
 	output := ""
 	exportCmd := &cobra.Command{
-		Use:    "export",
-		Short:  "导出为 m3u 格式",
-		PreRun: migrate,
+		Use:   "export",
+		Short: "导出为 m3u 格式",
 		Run: func(cmd *cobra.Command, args []string) {
 			exportTankPagesList(output)
 		},
 	}
+
 	exportCmd.Flags().StringVarP(&output, "output", "o", "", "导出路径")
 	_ = exportCmd.MarkFlagRequired("output")
 	cnt = cmd.Flags().IntP(string(concurrentKey), "c", 10, "指定并发数量")
 	page = cmd.Flags().IntP("page", "p", 1, "指定起始页码")
 	cmd.AddCommand(exportCmd)
+
+	token, debug := "", new(bool)
+	upload := &cobra.Command{
+		Use:   "upload",
+		Short: "上传至 telegram 机器人频道",
+		Run: func(cmd *cobra.Command, args []string) {
+			ctx := context.WithValue(cmd.Context(), telegram.Token, token)
+			ctx = context.WithValue(ctx, telegram.Debug, *debug)
+
+			f, err := os.CreateTemp("", "tank.m3u")
+			if err != nil {
+				log.Fatal(err)
+			}
+			_ = f.Close()
+			defer os.Remove(f.Name())
+			exportTankPagesList(f.Name())
+			telegram.UploadToChannel(ctx, f.Name())
+		},
+	}
+
+	upload.Flags().StringVarP(&token, "token", "t", "", "telegram bot 令牌")
+	debug = upload.PersistentFlags().Bool("debug", false, "debug 模式")
+	cmd.AddCommand(upload)
 
 	return cmd
 }
