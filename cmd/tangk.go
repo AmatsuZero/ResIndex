@@ -65,7 +65,7 @@ func getTankPageLinks(ctx context.Context, start int) (err error) {
 					link = tankHost.JoinPath(link).String()
 					model := &TankModel{}
 					model.Ref = sql.NullString{String: link, Valid: true}
-					donCreate := !dao.Any(model, "ref = ?", link) && len(model.Url) > 0
+					donCreate := !dao.NotExist(model, "ref = ?", link) && len(model.Url) > 0
 					name := td.Text()
 					tag := selection.Find(fmt.Sprintf("body > main > div > div > a > table > tbody > tr:nth-child(%v) > td:nth-child(3)", i+1)).Text()
 					model.Name = sql.NullString{String: name, Valid: true}

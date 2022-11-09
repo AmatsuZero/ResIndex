@@ -20,7 +20,7 @@ func NewArticle() *cobra.Command {
 		Use:   "nl",
 		Short: "新作品",
 		PreRun: func(cmd *cobra.Command, args []string) {
-			err := dao.DB.AutoMigrate(&InfoModel{})
+			err := dao.DB.AutoMigrate(&SisPageModel{})
 			if err != nil {
 				log.Panicf("自动迁移失败: %v", err)
 			}
@@ -179,10 +179,10 @@ func (n *NewList) ExtractInfo() error {
 	return nil
 }
 
-func (n *NewList) extractDetails(infos []ThreadInfo) []*InfoModel {
+func (n *NewList) extractDetails(infos []ThreadInfo) []*SisPageModel {
 	wg := sync.WaitGroup{}
 
-	output := make([]*InfoModel, 0)
+	output := make([]*SisPageModel, 0)
 	var lock sync.Mutex
 
 	for _, info := range infos {
@@ -206,7 +206,7 @@ func (n *NewList) extractDetails(infos []ThreadInfo) []*InfoModel {
 	return output
 }
 
-func (n *NewList) extractDetail(info ThreadInfo) (*InfoModel, error) {
+func (n *NewList) extractDetail(info ThreadInfo) (*SisPageModel, error) {
 	detail := Detail{
 		ThreadInfo: info,
 		Category:   "new",

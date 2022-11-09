@@ -41,7 +41,7 @@ func extract91Links(ctx context.Context, htmlContent string, hasNextPage *bool) 
 			return
 		}
 
-		donCreate := !dao.Any(model, "ref = ?", ref) && len(model.Url) > 0
+		donCreate := !dao.NotExist(model, "ref = ?", ref) && len(model.Url) > 0
 		title := a.Find(".video-title.title-truncate.m-t-5").Text()
 		model.Name = sql.NullString{String: title, Valid: true}
 

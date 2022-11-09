@@ -4,6 +4,8 @@ import (
 	"ResIndex/cmd/sis001"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
+	"log"
+	"time"
 )
 
 func Sis() *cobra.Command {
@@ -17,6 +19,14 @@ func Sis() *cobra.Command {
 			ctx := context.WithValue(cmd.Context(), sis001.ConcurrentKey, ch)
 			cmd.SetContext(ctx)
 			sis001.PreRun(cmd)
+		},
+		PersistentPostRun: func(cmd *cobra.Command, _ []string) {
+			t, ok := cmd.Context().Value(sis001.StartTimeKey).(time.Time)
+			if !ok {
+				return
+			}
+			now := time.Now()
+			log.Printf("🚀 任务结束，耗时：%v\n", now.Sub(t))
 		},
 	}
 

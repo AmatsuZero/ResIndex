@@ -16,12 +16,12 @@ type Detail struct {
 	Host     string
 }
 
-func (d *Detail) ExtractInfo() (*InfoModel, error) {
+func (d *Detail) ExtractInfo() (*SisPageModel, error) {
 	doc, err := d.GetDoc(d.href)
 	if err != nil {
 		return nil, err
 	}
-	model := &InfoModel{}
+	model := &SisPageModel{}
 	model.Category = d.Category
 	model.Tags = d.tag
 
@@ -32,7 +32,7 @@ func (d *Detail) ExtractInfo() (*InfoModel, error) {
 	sel := "#postmessage_" + model.PostId
 	text := doc.Find(sel).Text()
 	model.FillInfo(strings.Split(text, "\n"))
-
+	model.ExtractNewListModelThumbnail(doc)
 	id = d.href
 	ext := path.Ext(id)
 	idx := strings.LastIndex(id, ext)
@@ -42,8 +42,12 @@ func (d *Detail) ExtractInfo() (*InfoModel, error) {
 	if len(model.Name.String) == 0 || model.Name.String == "---" {
 		model.ExtractNewListModelTitle(doc)
 	}
-	model.TorrentLink, err = d.extractNewListModelTorrentLink(doc, model.PostId)
-	dao.DB.Create(model)
+	model.Url, err = d.extractNewListModelTorrentLink(doc, model.PostId)
+
+	if dao.NotExist(model) {
+		dao.DB.Create(model)
+	}
+
 	return model, err
 }
 

@@ -3,27 +3,26 @@ package sis001
 import (
 	"ResIndex/dao"
 	"database/sql"
-	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"path"
 	"regexp"
 	"strings"
 )
 
-type InfoModel struct {
+type SisPageModel struct {
 	dao.M3U8Resource
-	ThreadId                         string `gorm:"primarykey"`
-	Format, PostId, Sig, TorrentLink string
-	Category, Size                   string
-	IsPosted, IsBlurred              bool
-	Actors, Thumbnails               string
+	ThreadId            string `gorm:"primarykey"`
+	Format, PostId, Sig string
+	Category, Size      string
+	IsPosted, IsBlurred bool
+	Actors, Thumbnails  string
 }
 
 func getSplitValue(str string) string {
 	separator := "："
 	idx := strings.LastIndex(str, separator)
 	if idx != -1 {
-		str = str[idx+1:]
+		str = str[idx+len(separator):]
 	}
 	return strings.TrimSpace(str)
 }
@@ -55,7 +54,7 @@ func getActors(str string) string {
 	return strings.Join(tmp, ",")
 }
 
-func (i *InfoModel) FillInfo(lines []string) {
+func (i *SisPageModel) FillInfo(lines []string) {
 	for _, line := range lines {
 		switch {
 		case strings.Contains(line, "影片名稱"):
@@ -79,7 +78,7 @@ func (i *InfoModel) FillInfo(lines []string) {
 	}
 }
 
-func (i *InfoModel) ExtractNewListModelTitle(doc *goquery.Document) {
+func (i *SisPageModel) ExtractNewListModelTitle(doc *goquery.Document) {
 	sel := "#pid" + i.PostId + " > tbody > tr:nth-child(1) > td.postcontent > div.postmessage.defaultpost > h2"
 	i.Name = sql.NullString{
 		String: doc.Find(sel).Text(),
@@ -87,18 +86,18 @@ func (i *InfoModel) ExtractNewListModelTitle(doc *goquery.Document) {
 	}
 }
 
-func (i *InfoModel) ExtractNewListModelThumbnail(doc *goquery.Document) {
+func (i *SisPageModel) ExtractNewListModelThumbnail(doc *goquery.Document) {
 	sel := "#postmessage_" + i.PostId + " > img"
-	links := doc.Find(sel).Map(func(i int, selection *goquery.Selection) string {
+	links := doc.Find(sel).FilterFunction(func(i int, selection *goquery.Selection) bool {
+		src, ok := selection.Attr("src")
+		if !ok {
+			return false
+		}
+		return path.Ext(src) != ".gif" // gif 图片是宣传图片，需要过滤掉
+	}).Map(func(i int, selection *goquery.Selection) string {
 		src, _ := selection.Attr("src")
 		return src
 	})
-	for _, link := range links {
-		if len(link) == 0 {
-			continue
-		}
-		if path.Ext(link) != ".gif" { // gif 图片是宣传图片，需要过滤掉
-			i.Thumbnails += fmt.Sprintf(",%v", link)
-		}
-	}
+
+	i.Thumbnails = strings.Join(links, ",")
 }

@@ -297,7 +297,7 @@ func extractEHentaiRefLinksOnPage(ctx context.Context, u string) (nextPage strin
 				}
 			}
 
-			donCreate := !dao.Any(model, "ref = ?", href) && len(model.Pages) > 0
+			donCreate := !dao.NotExist(model, "ref = ?", href) && len(model.Pages) > 0
 
 			sel := selection.Find("td.gl2c > div.glthumb > div:nth-child(1) > img")
 			link, ok := sel.Attr("src")
