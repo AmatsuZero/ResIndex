@@ -1,7 +1,6 @@
 package telegram
 
 import (
-	"ResIndex/cmd"
 	"ResIndex/dao"
 	"context"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -49,7 +48,7 @@ func UploadToChannel(ctx context.Context, dir string) {
 }
 
 func upload91Model(exe, dir string, bot *tgbotapi.BotAPI) {
-	var records []*cmd.NinetyOneVideo
+	var records []*dao.NinetyOneVideo
 	dao.DB.Find(&records)
 
 	for _, record := range records {

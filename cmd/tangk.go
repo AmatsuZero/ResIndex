@@ -31,12 +31,6 @@ const (
 	concurrentKey ContextKey = "concurrent"
 )
 
-type TankModel struct {
-	dao.M3U8Resource
-	UpdateTime time.Time
-	Duration   float64
-}
-
 func getTankPageLinks(ctx context.Context, start int) (err error) {
 	tankHost, err = url.Parse("https://vip.tangk2.com")
 	if err != nil {
@@ -48,7 +42,7 @@ func getTankPageLinks(ctx context.Context, start int) (err error) {
 
 	shouldStop := false
 	for !shouldStop {
-		var models []*TankModel
+		var models []*dao.TankModel
 		log.Printf("第%v页解析开始\n", page)
 		e := utils.GetDocument(u.String(), func(doc *goquery.Document) { // 解析有多少页
 			loc, _ := time.LoadLocation("Asia/Shanghai")
@@ -63,7 +57,7 @@ func getTankPageLinks(ctx context.Context, start int) (err error) {
 						return
 					}
 					link = tankHost.JoinPath(link).String()
-					model := &TankModel{}
+					model := &dao.TankModel{}
 					model.Ref = sql.NullString{String: link, Valid: true}
 					donCreate := !dao.NotExist(model, "ref = ?", link) && len(model.Url) > 0
 					name := td.Text()
@@ -107,7 +101,7 @@ func getTankPageLinks(ctx context.Context, start int) (err error) {
 }
 
 // 更新详情页
-func updateTankDetailPages(ctx context.Context, models []*TankModel) {
+func updateTankDetailPages(ctx context.Context, models []*dao.TankModel) {
 	concurrent := ctx.Value(concurrentKey).(int)
 	ch := make(chan struct{}, concurrent)
 	wg := &sync.WaitGroup{}
@@ -120,7 +114,7 @@ func updateTankDetailPages(ctx context.Context, models []*TankModel) {
 		wg.Add(1)
 		ch <- struct{}{}
 
-		go func(m *TankModel) {
+		go func(m *dao.TankModel) {
 			defer wg.Done()
 			e := utils.GetDocument(m.Ref.String, func(doc *goquery.Document) { // 找到 m3u8 资源链接
 				val, ok := doc.Find("body > main > section.dy-collect > div > div:nth-child(2) > ul > li > a:nth-child(4)").Attr("href")
@@ -142,7 +136,7 @@ func updateTankDetailPages(ctx context.Context, models []*TankModel) {
 	wg.Wait()
 }
 
-func updateTankPageDuration(u string, model *TankModel) {
+func updateTankPageDuration(u string, model *dao.TankModel) {
 	resp, err := http.Get(u)
 	if err != nil {
 		log.Printf("访问资源地址失败: %v\n", err)
@@ -181,7 +175,7 @@ func updateTankPageDuration(u string, model *TankModel) {
 }
 
 func exportTankPagesList(output string) {
-	var records []*TankModel
+	var records []*dao.TankModel
 	dao.DB.Find(&records)
 
 	playlist := &m3u.Playlist{}
@@ -227,7 +221,7 @@ func Tank() *cobra.Command {
 		Short: "坦克资源网资源爬取",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			log.SetPrefix("Tank ")
-			err := dao.DB.AutoMigrate(&TankModel{})
+			err := dao.DB.AutoMigrate(&dao.TankModel{})
 			if err != nil {
 				log.Panicf("自动迁移失败: %v", err)
 			}

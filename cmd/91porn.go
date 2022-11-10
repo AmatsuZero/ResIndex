@@ -18,12 +18,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type NinetyOneVideo struct {
-	dao.M3U8Resource
-	Author, Duration string
-	AddedAt          time.Time
-}
-
 func extract91Links(ctx context.Context, htmlContent string, hasNextPage *bool) error {
 	document, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
 	if err != nil {
@@ -31,9 +25,9 @@ func extract91Links(ctx context.Context, htmlContent string, hasNextPage *bool) 
 	}
 
 	rows := document.Find("#wrapper > div.container.container-minheight > div.row > div > div").Children()
-	models := make([]*NinetyOneVideo, 0, rows.Length())
+	models := make([]*dao.NinetyOneVideo, 0, rows.Length())
 	rows.Each(func(i int, selection *goquery.Selection) {
-		model := &NinetyOneVideo{}
+		model := &dao.NinetyOneVideo{}
 		sel := selection.Find(".well.well-sm.videos-text-align")
 		a := sel.Find("a")
 		ref, ok := a.Attr("href")
@@ -82,7 +76,7 @@ func extract91Links(ctx context.Context, htmlContent string, hasNextPage *bool) 
 	return update91PornDetails(ctx, models)
 }
 
-func update91PornDetails(ctx context.Context, models []*NinetyOneVideo) error {
+func update91PornDetails(ctx context.Context, models []*dao.NinetyOneVideo) error {
 	concurrent := ctx.Value(concurrentKey).(int)
 	ch := make(chan struct{}, concurrent)
 	wg := &sync.WaitGroup{}
@@ -93,7 +87,7 @@ func update91PornDetails(ctx context.Context, models []*NinetyOneVideo) error {
 		wg.Add(1)
 		ch <- struct{}{}
 
-		go func(model *NinetyOneVideo) {
+		go func(model *dao.NinetyOneVideo) {
 			defer wg.Done()
 
 			if !model.Ref.Valid {
@@ -160,7 +154,7 @@ func parseDuration(st string) (int, error) {
 }
 
 func export91PageLinks(output string) {
-	var records []*NinetyOneVideo
+	var records []*dao.NinetyOneVideo
 	dao.DB.Find(&records)
 
 	playlist := &m3u.Playlist{}
@@ -205,7 +199,7 @@ func export91PageLinks(output string) {
 }
 
 func download91Resources(exe, output string, concurrent int) {
-	var records []*NinetyOneVideo
+	var records []*dao.NinetyOneVideo
 	dao.DB.Find(&records)
 
 	ch := make(chan struct{}, concurrent)
@@ -215,7 +209,7 @@ func download91Resources(exe, output string, concurrent int) {
 		wg.Add(1)
 		ch <- struct{}{}
 
-		go func(r *NinetyOneVideo) {
+		go func(r *dao.NinetyOneVideo) {
 			defer wg.Done()
 			msg, err := r.Download(exe, output)
 			if err == nil {
@@ -238,7 +232,7 @@ func NinetyOne() *cobra.Command {
 		Short: "91 porn 资源爬取",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			log.SetPrefix("91porn ")
-			err := dao.DB.AutoMigrate(&NinetyOneVideo{})
+			err := dao.DB.AutoMigrate(&dao.NinetyOneVideo{})
 			if err != nil {
 				log.Panicf("自动迁移失败: %v", err)
 			}

@@ -1,7 +1,6 @@
 package browser
 
 import (
-	"ResIndex/cmd"
 	"ResIndex/dao"
 	"encoding/json"
 	"github.com/gorilla/mux"
@@ -39,7 +38,7 @@ func get91Videos(w http.ResponseWriter, r *http.Request) {
 		page = "1"
 	}
 
-	var videos []*cmd.NinetyOneVideo
+	var videos []*dao.NinetyOneVideo
 	dao.DB.Take(&videos)
 	sendJSONResponse(w, videos)
 }

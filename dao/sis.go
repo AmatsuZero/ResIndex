@@ -1,7 +1,6 @@
-package sis001
+package dao
 
 import (
-	"ResIndex/dao"
 	"database/sql"
 	"github.com/PuerkitoBio/goquery"
 	"path"
@@ -10,7 +9,7 @@ import (
 )
 
 type SisPageModel struct {
-	dao.M3U8Resource
+	M3U8Resource
 	ThreadId            string `gorm:"primarykey"`
 	Format, PostId, Sig string
 	Category, Size      string

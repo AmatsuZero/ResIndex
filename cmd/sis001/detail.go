@@ -16,12 +16,12 @@ type Detail struct {
 	Host     string
 }
 
-func (d *Detail) ExtractInfo() (*SisPageModel, error) {
+func (d *Detail) ExtractInfo() (*dao.SisPageModel, error) {
 	doc, err := d.GetDoc(d.href)
 	if err != nil {
 		return nil, err
 	}
-	model := &SisPageModel{}
+	model := &dao.SisPageModel{}
 	model.Category = d.Category
 	model.Tags = d.tag
 
