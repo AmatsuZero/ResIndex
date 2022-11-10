@@ -78,6 +78,10 @@ func startBot(cmd *cobra.Command, _ []string) {
 		ch <- struct{}{}
 
 		go func(update tgbotapi.Update) {
+			if update.Message == nil {
+				return
+			}
+
 			tmpDir, e := os.MkdirTemp("", fmt.Sprintf("bot-%v", update.Message.MessageID))
 			if e != nil {
 				return
@@ -87,10 +91,6 @@ func startBot(cmd *cobra.Command, _ []string) {
 				<-ch
 				_ = os.RemoveAll(tmpDir)
 			}()
-
-			if update.Message == nil {
-				return
-			}
 
 			var msg tgbotapi.Chattable
 			if !update.Message.IsCommand() {
