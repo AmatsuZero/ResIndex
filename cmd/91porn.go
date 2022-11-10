@@ -2,13 +2,11 @@ package cmd
 
 import (
 	"ResIndex/dao"
-	"ResIndex/telegram"
 	"ResIndex/utils"
 	"context"
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -284,29 +282,6 @@ func NinetyOne() *cobra.Command {
 
 	cmd.AddCommand(exportCmd)
 	cmd.AddCommand(downloadCmd)
-
-	token, debug := "", new(bool)
-	upload := &cobra.Command{
-		Use:   "upload",
-		Short: "上传至 telegram 机器人频道",
-		Run: func(cmd *cobra.Command, args []string) {
-			ctx := context.WithValue(cmd.Context(), telegram.Token, token)
-			ctx = context.WithValue(ctx, telegram.Debug, *debug)
-			ctx = context.WithValue(ctx, telegram.DownloaderPath, execPath)
-			ctx = context.WithValue(ctx, telegram.ModelType, "91")
-			dir, err := os.MkdirTemp("", "download")
-			if err != nil {
-				log.Fatalln(err)
-			}
-			defer os.RemoveAll(dir)
-			telegram.UploadToChannel(ctx, dir)
-		},
-	}
-
-	upload.Flags().StringVarP(&token, "token", "t", "", "telegram bot 令牌")
-	debug = upload.PersistentFlags().Bool("debug", false, "debug 模式")
-	upload.Flags().StringVarP(&execPath, "exec", "e", "m3u8-downloader", "指定下载器路径")
-	cmd.AddCommand(upload)
 
 	return cmd
 }

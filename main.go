@@ -4,6 +4,7 @@ import (
 	"ResIndex/browser"
 	"ResIndex/cmd"
 	"ResIndex/dao"
+	"ResIndex/telegram"
 	"ResIndex/utils"
 	"github.com/spf13/cobra"
 )
@@ -26,6 +27,7 @@ func main() {
 		cmd.EHentai(),
 		cmd.Sis(),
 		browser.Cmd(),
+		telegram.Cmd(),
 	)
 	_ = rootCmd.Execute()
 }

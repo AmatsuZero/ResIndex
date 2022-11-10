@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"ResIndex/dao"
-	"ResIndex/telegram"
 	"ResIndex/utils"
 	"context"
 	"database/sql"
@@ -11,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -249,29 +247,6 @@ func Tank() *cobra.Command {
 	cnt = cmd.Flags().IntP(string(concurrentKey), "c", 10, "指定并发数量")
 	page = cmd.Flags().IntP("page", "p", 1, "指定起始页码")
 	cmd.AddCommand(exportCmd)
-
-	token, debug := "", new(bool)
-	upload := &cobra.Command{
-		Use:   "upload",
-		Short: "上传至 telegram 机器人频道",
-		Run: func(cmd *cobra.Command, args []string) {
-			ctx := context.WithValue(cmd.Context(), telegram.Token, token)
-			ctx = context.WithValue(ctx, telegram.Debug, *debug)
-
-			f, err := os.CreateTemp("", "tank.m3u")
-			if err != nil {
-				log.Fatal(err)
-			}
-			_ = f.Close()
-			defer os.Remove(f.Name())
-			exportTankPagesList(f.Name())
-			telegram.UploadToChannel(ctx, f.Name())
-		},
-	}
-
-	upload.Flags().StringVarP(&token, "token", "t", "", "telegram bot 令牌")
-	debug = upload.PersistentFlags().Bool("debug", false, "debug 模式")
-	cmd.AddCommand(upload)
 
 	return cmd
 }
