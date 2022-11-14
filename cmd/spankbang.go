@@ -33,9 +33,9 @@ func getDownloadLink(u string) error {
 	err = utils.VisitWebPageWithActions(
 		fmt.Sprintf("%v://%v", addr.Scheme, addr.Host),
 		chromedp.Navigate(addr.String()),
-		chromedp.Sleep(100*time.Second),
 		chromedp.WaitVisible("document.querySelector(\"#video > div.left > ul.video_toolbar > li.dl > svg > use\")", chromedp.ByJSPath),
-		chromedp.Click("document.querySelector(\"#video > div.left > ul.video_toolbar > li.dl > svg > use\")", chromedp.ByJSPath),
+		chromedp.Click("document.querySelector(\"#video > div.left > ul.video_toolbar > li.dl\")", chromedp.ByJSPath),
+		chromedp.Sleep(100*time.Second),
 	)
 
 	if err != nil {

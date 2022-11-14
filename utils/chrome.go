@@ -45,7 +45,7 @@ func VisitWebPageWithActions(host string, actions ...chromedp.Action) (err error
 		chromedp.Flag("headless", true), // debug使用
 		chromedp.Flag("blink-settings", "imagesEnabled=false"),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36`),
-		chromedp.Flag("mute-audio", false), // 关闭声音
+		chromedp.Flag("mute-audio", true), // 关闭声音
 		//启动chrome 不适用沙盒, 性能优先
 		chromedp.Flag("no-sandbox", true),
 		//启动chrome的时候不检查默认浏览器
@@ -78,7 +78,6 @@ func VisitWebPageWithActions(host string, actions ...chromedp.Action) (err error
 	defer cancel()
 
 	err = chromedp.Run(timeoutCtx, actions...)
-
 	if err != nil {
 		log.Printf("Run err : %v\n\n", err)
 		_ = chromedp.Cancel(timeoutCtx)
@@ -115,7 +114,7 @@ func setHeaders(host string, headers map[string]interface{}, res *string) chrome
 		network.Enable(),
 		network.SetExtraHTTPHeaders(headers),
 		chromedp.Navigate(host),
-		chromedp.Text(`#result`, res, chromedp.ByID, chromedp.NodeVisible),
+		chromedp.Sleep(3 * time.Second),
 	}
 }
 
