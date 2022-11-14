@@ -9,6 +9,7 @@ import (
 	"github.com/chromedp/chromedp"
 	"log"
 	"math/rand"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -39,7 +40,7 @@ func GetDocumentByChrome(url string, extractor ...func(doc *goquery.Document)) e
 	return nil
 }
 
-func VisitWebPage(url string) (html string, err error) {
+func VisitWebPageWithActions(host string, actions ...chromedp.Action) (err error) {
 	options := []chromedp.ExecAllocatorOption{
 		chromedp.Flag("headless", true), // debug使用
 		chromedp.Flag("blink-settings", "imagesEnabled=false"),
@@ -61,7 +62,7 @@ func VisitWebPage(url string) (html string, err error) {
 	// 执行一个空task, 用提前创建Chrome实例
 	var res string
 	err = chromedp.Run(chromeCtx, setHeaders(
-		"91porn.com",
+		host,
 		map[string]interface{}{
 			"Accept-Language": "zh-cn,zh;q=0.5",
 			"X-Forwarded-For": genIpaddr(),
@@ -69,11 +70,30 @@ func VisitWebPage(url string) (html string, err error) {
 		&res,
 	))
 
+	if err != nil {
+		return
+	}
+
 	timeoutCtx, cancel := context.WithTimeout(chromeCtx, 1000*time.Second)
 	defer cancel()
 
+	err = chromedp.Run(timeoutCtx, actions...)
+
+	if err != nil {
+		log.Printf("Run err : %v\n\n", err)
+		_ = chromedp.Cancel(timeoutCtx)
+		return
+	}
+	return
+}
+
+func VisitWebPage(u string) (html string, err error) {
+	addr, err := url.Parse(u)
+	if err != nil {
+		return "", err
+	}
 	acts := []chromedp.Action{
-		chromedp.Navigate(url),
+		chromedp.Navigate(addr.String()),
 		chromedp.Sleep(200 * time.Millisecond),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			node, err := dom.GetDocument().Do(ctx)
@@ -85,13 +105,7 @@ func VisitWebPage(url string) (html string, err error) {
 		}),
 	}
 
-	err = chromedp.Run(timeoutCtx, acts...)
-
-	if err != nil {
-		log.Printf("Run err : %v\n\n", err)
-		_ = chromedp.Cancel(timeoutCtx)
-		return
-	}
+	err = VisitWebPageWithActions(fmt.Sprintf("%v://%v", addr.Scheme, addr.Host), acts...)
 	return
 }
 

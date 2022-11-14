@@ -28,6 +28,7 @@ func main() {
 		cmd.Sis(),
 		browser.Cmd(),
 		telegram.Cmd(),
+		cmd.Spankbang(),
 	)
 	_ = rootCmd.Execute()
 }
